@@ -3,7 +3,16 @@ GEM
   specs:
     amqp (0.6.7)
       eventmachine (>= 0.12.4)
+    diff-lcs (1.1.2)
     eventmachine (0.12.10)
+    rspec (2.1.0)
+      rspec-core (~> 2.1.0)
+      rspec-expectations (~> 2.1.0)
+      rspec-mocks (~> 2.1.0)
+    rspec-core (2.1.0)
+    rspec-expectations (2.1.0)
+      diff-lcs (~> 1.1.2)
+    rspec-mocks (2.1.0)
 
 PLATFORMS
   ruby
@@ -11,3 +20,4 @@ PLATFORMS
 DEPENDENCIES
   amqp
   eventmachine
+  rspec

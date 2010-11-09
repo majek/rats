@@ -2,10 +2,10 @@ require 'mq'
 
 class RATS
   attr_reader :client
-  def initialize amqp_url, opts={}, &blk
+  def initialize(amqp_url=nil, opts={}, &blk)
     raise 'can only be used from within EM.run{}' unless EM.reactor_running?
 
-    opts = AMQP::Client.parse_amqp_url(amqp_url).merge(opts)
+    opts = AMQP::Client.parse_amqp_url(amqp_url || 'amqp:///').merge(opts)
     @client = AMQP::connect(opts)
     @client.connection_status do |status|
       case status
@@ -18,9 +18,9 @@ class RATS
     @mq = MQ.new(@client)
     @on_connect = blk
 
-    @exch_name = 'rats'
-    @exchange = exchange('topic', @exch_name)
-    @empty_exchange = exchange('direct', '')
+    @exchange_name = opts[:exchange] || 'rats'
+    @exchange = amqp_exchange('topic', @exchange_name)
+    @empty_exchange = amqp_exchange('direct', '')
 
     @resp_map = Hash.new
     @resp_qname = "response.#{(rand*2E14).floor}"
@@ -31,7 +31,10 @@ class RATS
       if @resp_map.has_key?(corr_id)
         blk = @resp_map[corr_id]
         @resp_map.delete(corr_id)
-        blk.call body
+        case blk.arity
+        when 0 then blk.call
+        else blk.call body
+        end
       end
     end
   end
@@ -58,17 +61,18 @@ class RATS
   end
 
   def subscribe(topic, &blk)
-    q = @mq.queue("#{@exch_name}.#{(rand*2E14).floor}", :auto_delete => true,
+    q = @mq.queue("#{@exchange_name}.#{(rand*2E14).floor}",
+                  :auto_delete => true,
                   :exclusive => true)
-    q.bind(@exchange, :key => topic).subscribe \
+    q.bind(@exchange, :key => (topic || '')).subscribe \
     do |properties, enc_body|
       reply_to = [properties.reply_to, properties.correlation_id]
       body = enc_body[1..-1]
       case blk.arity
       when 0 then blk.call
-      when 1 then blk.call [body]
-      when 2 then blk.call [body, reply_to]
-      else blk.call [body, reply_to, properties.routing_key]
+      when 1 then blk.call(body)
+      when 2 then blk.call(body, reply_to)
+      else blk.call(body, reply_to, properties.routing_key)
       end
     end
     q
@@ -84,14 +88,14 @@ class RATS
       return self.reply(topic, body, opts, &blk)
     end
     @exchange.publish(' '+body.to_s, # can't handle empty frames.
-                      {:key => topic,
+                      {:key => (topic || ''),
                         :content_type => 'text/plain'}.merge(opts))
     blk.call if blk
   end
 
   def reply(reply, body='', opts={}, &blk)
     reply_to, corr_id = reply
-    @empty_exchange.publish(' ',
+    @empty_exchange.publish(' '+body.to_s,
                             {:key => reply_to, :correlation_id => corr_id,
                               :content_type => 'text/plain'}.merge(opts))
     blk.call if blk
@@ -100,7 +104,7 @@ class RATS
 
   private
 
-  def exchange(exch_type, exch_name)
+  def amqp_exchange(exch_type, exch_name)
     @mq.__send__(exch_type, exch_name)
   end
 end
