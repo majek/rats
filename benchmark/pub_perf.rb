@@ -29,10 +29,13 @@ EM::run do
     $to_drain-=1
     # Send last message and add closure which gets called when the server has processed
     # the message. This way we know all messages have been processed by the server.
-    @rats.publish($sub, $data) {
-      puts "\nTest completed : #{($loop/(Time.now-$start)).ceil} msgs/sec.\n"
-      @rats.stop { EM.stop }
-    }
+    @rats.publish($sub, $data) do
+      puts "\nPublishing completed : #{($loop/(Time.now-$start)).ceil} msgs/sec.\n"
+      @rats.stop do
+        puts "Sending completed : #{($loop/(Time.now-$start)).ceil} msgs/sec.\n"
+        EM.stop
+      end
+    end
   end
 
   def drain
