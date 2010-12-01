@@ -1,3 +1,4 @@
+require 'rubygems'
 require 'mq'
 
 class RATS
@@ -109,8 +110,7 @@ class RATS
   end
 end
 
-
-
+require 'uri'
 
 module AMQP
   module Client
